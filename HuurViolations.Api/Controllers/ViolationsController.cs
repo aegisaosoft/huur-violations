@@ -28,7 +28,12 @@ public class ViolationsController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Get all violations (public endpoint)
+    /// </summary>
+    /// <returns>List of violations</returns>
     [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<object>), 200)]
     public IActionResult GetViolations()
     {
         _logger.LogInformation("Getting all violations");
@@ -83,6 +88,23 @@ public class ViolationsController : ControllerBase
         _logger.LogInformation("Deleting violation with ID: {Id}", id);
         
         return NoContent();
+    }
+
+    /// <summary>
+    /// Health check endpoint (public)
+    /// </summary>
+    /// <returns>API status</returns>
+    [HttpGet("health")]
+    [ProducesResponseType(typeof(object), 200)]
+    public IActionResult GetHealth()
+    {
+        return Ok(new 
+        { 
+            Status = "Healthy", 
+            Timestamp = DateTime.UtcNow,
+            Version = "1.0.0",
+            Message = "HuurViolations API is running"
+        });
     }
 }
 
