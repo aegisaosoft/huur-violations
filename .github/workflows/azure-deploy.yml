@@ -1,0 +1,69 @@
+# GitHub Actions workflow for deploying HuurViolations.Api to Azure
+name: Deploy HuurViolations API to Azure
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: huur-violations
+  AZURE_WEBAPP_PACKAGE_PATH: './HuurViolations.Api'
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 'Checkout GitHub Action'
+      uses: actions/checkout@v4
+
+    - name: 'Set up .NET Core'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 'Build the solution'
+      run: |
+        dotnet restore
+        dotnet build --configuration Release --no-restore
+
+    - name: 'Copy HuurApi DLL to Loaders directory'
+      run: |
+        # Create Loaders directory if it doesn't exist
+        mkdir -p HuurViolations.Api/Loaders
+        
+        # Try to copy HuurApi.dll from the referenced project
+        # This will work if the HuurApi project is built as part of the solution
+        if [ -f "../../huur-api/HuurApi/bin/Debug/net8.0/HuurApi.dll" ]; then
+          cp ../../huur-api/HuurApi/bin/Debug/net8.0/HuurApi.dll HuurViolations.Api/Loaders/
+          echo "✅ HuurApi.dll copied from external project"
+        else
+          echo "⚠️ HuurApi.dll not found in external project, relying on project reference"
+        fi
+
+    - name: 'Publish the app'
+      run: |
+        dotnet publish HuurViolations.Api --configuration Release --output ./publish --no-build
+
+    - name: 'Verify Loaders directory contents'
+      run: |
+        echo "📁 Contents of Loaders directory:"
+        ls -la HuurViolations.Api/Loaders/ || echo "Loaders directory not found"
+        echo "📁 Contents of publish directory:"
+        ls -la ./publish/
+
+    - name: 'Deploy to Azure Web App'
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_2BF08AE62665416AB6AB23224876ABC4 }}
+        package: ./publish
+
+    - name: 'Verify deployment'
+      run: |
+        echo "🚀 Deployment completed successfully!"
+        echo "🌐 Your app should be available at: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"

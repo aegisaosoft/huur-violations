@@ -17,4 +17,8 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
   </ItemGroup>
 
+  <Target Name="CopyHuurApiToLoaders" AfterTargets="Build">
+    <Copy SourceFiles="..\..\huur-api\HuurApi\bin\Debug\net8.0\HuurApi.dll" DestinationFolder="..\HuurViolations.Api\Loaders\" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

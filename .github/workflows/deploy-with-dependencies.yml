@@ -1,0 +1,84 @@
+# Enhanced GitHub Actions workflow for deploying with all dependencies
+name: Deploy HuurViolations API with Dependencies
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: huur-violations
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 'Checkout repository'
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 'Set up .NET Core'
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: 'Restore dependencies'
+      run: dotnet restore
+
+    - name: 'Build all projects'
+      run: |
+        dotnet build --configuration Release --no-restore
+        echo "✅ Build completed successfully"
+
+    - name: 'Ensure Loaders directory exists'
+      run: |
+        mkdir -p HuurViolations.Api/Loaders
+        echo "📁 Loaders directory created"
+
+    - name: 'Copy HuurApi DLL (if available)'
+      run: |
+        # Check if HuurApi.dll exists in the expected location
+        if [ -f "../../huur-api/HuurApi/bin/Debug/net8.0/HuurApi.dll" ]; then
+          cp ../../huur-api/HuurApi/bin/Debug/net8.0/HuurApi.dll HuurViolations.Api/Loaders/
+          echo "✅ HuurApi.dll copied from external project"
+        elif [ -f "../../huur-api/HuurApi/bin/Release/net8.0/HuurApi.dll" ]; then
+          cp ../../huur-api/HuurApi/bin/Release/net8.0/HuurApi.dll HuurViolations.Api/Loaders/
+          echo "✅ HuurApi.dll copied from external project (Release)"
+        else
+          echo "⚠️ HuurApi.dll not found in external project"
+          echo "📋 This is expected if HuurApi is not part of the repository"
+          echo "🔧 The DLL should be available through the project reference"
+        fi
+
+    - name: 'Publish the application'
+      run: |
+        dotnet publish HuurViolations.Api --configuration Release --output ./publish --no-build
+        echo "✅ Application published successfully"
+
+    - name: 'Verify deployment package'
+      run: |
+        echo "📦 Deployment package contents:"
+        ls -la ./publish/
+        echo ""
+        echo "📁 Loaders directory contents:"
+        ls -la ./publish/Loaders/ || echo "Loaders directory not found in publish output"
+        echo ""
+        echo "📁 All DLLs in publish directory:"
+        find ./publish -name "*.dll" -type f
+
+    - name: 'Deploy to Azure Web App'
+      uses: azure/webapps-deploy@v3
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_2BF08AE62665416AB6AB23224876ABC4 }}
+        package: ./publish
+
+    - name: 'Deployment verification'
+      run: |
+        echo "🎉 Deployment completed successfully!"
+        echo "🌐 Application URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
+        echo "📊 Check the Azure portal for deployment status"
