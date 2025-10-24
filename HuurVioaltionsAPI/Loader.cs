@@ -79,7 +79,7 @@ namespace HuurVioaltionsAPI
                 .AddEnvironmentVariables()
                 .Build();
 
-            var maxThreads = configuration.GetValue<int>("MaxThreads", 1);
+            var maxThreads = configuration["MaxThreads"] != null ? int.Parse(configuration["MaxThreads"]) : 1;
             Console.WriteLine($"Providers discovered: {callers.Count}");
             Console.WriteLine($"Processing with {maxThreads} thread(s)");
 

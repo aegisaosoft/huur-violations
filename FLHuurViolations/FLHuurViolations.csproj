@@ -7,6 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Reference Include="HuurApi">
+      <HintPath>..\HuurViolations.Api\Loaders\HuurApi.dll</HintPath>
+    </Reference>
     <ProjectReference Include="..\HuurVioaltionsAPI\HuurVioaltionsAPI.csproj" />
   </ItemGroup>
 
