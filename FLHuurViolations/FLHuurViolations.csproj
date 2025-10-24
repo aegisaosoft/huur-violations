@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HuurVioaltionsAPI\HuurVioaltionsAPI.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyToLoaders" AfterTargets="Build">
+    <Copy SourceFiles="$(TargetDir)$(TargetFileName)" DestinationFolder="..\HuurViolations.Api\Loaders\" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
