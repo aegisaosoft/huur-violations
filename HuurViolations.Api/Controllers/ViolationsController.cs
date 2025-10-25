@@ -14,6 +14,8 @@
  */
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using HuurViolations.Auth;
 
 namespace HuurViolations.Api.Controllers;
 
@@ -22,10 +24,12 @@ namespace HuurViolations.Api.Controllers;
 public class ViolationsController : ControllerBase
 {
     private readonly ILogger<ViolationsController> _logger;
+    private readonly IAuthenticationService _authenticationService;
 
-    public ViolationsController(ILogger<ViolationsController> logger)
+    public ViolationsController(ILogger<ViolationsController> logger, IAuthenticationService authenticationService)
     {
         _logger = logger;
+        _authenticationService = authenticationService;
     }
 
     /// <summary>
@@ -91,74 +95,58 @@ public class ViolationsController : ControllerBase
     }
 
     /// <summary>
-    /// Get all violations with JSON parameters (public endpoint)
+    /// Get all violations with JSON parameters (requires Bearer authentication)
     /// </summary>
     /// <param name="request">Search parameters</param>
     /// <returns>List of violations based on parameters</returns>
     [HttpPost("get-all")]
+    [Authorize] // Requires Bearer token authentication
     [ProducesResponseType(typeof(IEnumerable<object>), 200)]
-    public IActionResult GetAllViolations([FromBody] ViolationSearchRequest request)
+    [ProducesResponseType(401)] // Unauthorized
+    public async Task<IActionResult> GetAllViolations([FromBody] ViolationSearchRequest request)
     {
         _logger.LogInformation("Getting all violations with parameters: {Parameters}", request);
         
-        // Sample data - replace with actual data access based on parameters
-        var violations = new[]
+        try
         {
-            new { 
-                Id = 1, 
-                Description = "Late rent payment", 
-                Amount = 50.00m, 
-                Date = DateTime.Now.AddDays(-5),
-                Finder = "Blinkay",
-                State = "FL",
-                LicensePlate = "ABC123"
-            },
-            new { 
-                Id = 2, 
-                Description = "Property damage", 
-                Amount = 200.00m, 
-                Date = DateTime.Now.AddDays(-10),
-                Finder = "Tampa",
-                State = "FL",
-                LicensePlate = "XYZ789"
-            },
-            new { 
-                Id = 3, 
-                Description = "Noise complaint", 
-                Amount = 25.00m, 
-                Date = DateTime.Now.AddDays(-2),
-                Finder = "Metropolis",
-                State = "FL",
-                LicensePlate = "DEF456"
-            }
-        };
-
-        // Filter based on parameters if provided
-        var filteredViolations = violations.AsEnumerable();
-        
-        // Filter by date_from if provided
-        if (!string.IsNullOrEmpty(request.date_from))
-        {
-            if (DateTime.TryParse(request.date_from, out var fromDate))
+            // Get the Bearer token from the Authorization header
+            var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+            if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
             {
-                filteredViolations = filteredViolations.Where(v => v.Date >= fromDate);
+                _logger.LogWarning("No valid Bearer token provided");
+                return Unauthorized(new { error = "Invalid or missing Bearer token" });
             }
-        }
-        
-        // Filter by Finders array if provided
-        if (request.Finders != null && request.Finders.Length > 0)
-        {
-            filteredViolations = filteredViolations.Where(v => 
-                request.Finders.Any(f => v.Finder.Equals(f, StringComparison.OrdinalIgnoreCase)));
-        }
 
-        return Ok(new
+            var token = authHeader.Substring("Bearer ".Length).Trim();
+            _logger.LogInformation("Using authentication service to validate token");
+
+            // Use the authentication service to validate the token
+            var authResult = await _authenticationService.ValidateTokenAsync(token);
+            
+            if (!authResult.IsValid)
+            {
+                _logger.LogWarning("Token validation failed: {Error}", authResult.Error);
+                return Unauthorized(new { error = "Token validation failed", details = authResult.Error });
+            }
+
+            _logger.LogInformation("Token validated successfully, returning empty array as requested");
+            
+            // Return empty array as requested when token is valid
+            return Ok(new
+            {
+                TotalCount = 0,
+                Parameters = request,
+                Violations = new object[0],
+                Message = "Token validated successfully"
+            });
+        }
+        catch (Exception ex)
         {
-            TotalCount = filteredViolations.Count(),
-            Parameters = request,
-            Violations = filteredViolations.ToArray()
-        });
+            _logger.LogError(ex, "Error during token validation");
+            return StatusCode(500, new { error = "Internal server error during authentication" });
+        }
     }
+
 
     /// <summary>
     /// Health check endpoint (public)
@@ -200,7 +188,16 @@ public class ViolationSearchRequest
     /// <summary>
     /// Array of finders to search
     /// </summary>
-    public string[]? Finders { get; set; }
+    public FinderItem[]? Finders { get; set; }
 }
+
+public class FinderItem
+{
+    /// <summary>
+    /// Name of the finder
+    /// </summary>
+    public string finder_name { get; set; } = string.Empty;
+}
+
 
 
